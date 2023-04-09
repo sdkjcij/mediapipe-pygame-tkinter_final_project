@@ -1,4 +1,5 @@
 import cv2
+import tkinter as tk
 import mediapipe as mp
 import math
 import time
@@ -46,7 +47,10 @@ for i in range(10):
     rock_imgs.append(pygame.image.load(os.path.join("img", f"rock{i}.png")).convert())
     # rock_imgs.append(pygame.transform.scale(rock_original_imgs, (random.randint(50,150), random.randint(38,114))))
 fat_guy_img = pygame.image.load(os.path.join("img", "fat_guy.png")).convert()
+fat_guy_img = pygame.transform.scale(fat_guy_img, (297, 446))
 alien_img = pygame.image.load(os.path.join("img", "alien_light.png"))
+winner_img = pygame.image.load(os.path.join("img", "winner.png"))
+loser_img = pygame.transform.scale(fat_guy_img, (297, 297))
 
 explosion_animation = {'Large_Explosion': [], "Small_Explosion": [], 'Player': [], 'Alien': []}
 
@@ -69,6 +73,7 @@ ammo_image = pygame.transform.scale(ammo_image, (60, 60))
 power_imgs = {'shield': pygame.image.load(os.path.join("img", "shield.png")).convert(),
               'gun': pygame.image.load(os.path.join("img", "gun.png")).convert(),
               'ammo': ammo_image}
+alien_attack_img = pygame.image.load(os.path.join("img", "alien_attack.png")).convert()
 
 # 載入音樂、音效
 shoot_sound = pygame.mixer.Sound(os.path.join("sound", "shoot.wav"))
@@ -109,6 +114,7 @@ Alien_x = 0
 Alien_y = 0
 times = 0
 alien_die = False
+is_replay = False
 
 
 # 中文&英文文字顯示
@@ -142,6 +148,20 @@ def draw_health(surf, hp, x, y):
     pygame.draw.rect(surf, WHITE, outline_rect, 2)
 
 
+# 繪製外星人生命條
+def draw_alien_health(surf, hp, x, y):
+    if hp < 0:
+        hp = 0
+
+    BAR_LENGTH = 100
+    BAR_HEIGHT = 10
+    fill = (hp / 400) * BAR_LENGTH
+    outline_rect = pygame.Rect(x, y, BAR_LENGTH, BAR_HEIGHT)
+    fill_rect = pygame.Rect(x, y, fill, BAR_HEIGHT)
+    pygame.draw.rect(surf, GREEN, fill_rect)
+    pygame.draw.rect(surf, WHITE, outline_rect, 2)
+
+
 # 繪製生命數
 def draw_lives(surf, lives, img, x, y):
     for i in range(lives):
@@ -169,12 +189,14 @@ def draw_init():
     text_normal_rect = text_normal.get_rect(center=(WIDTH / 2, HEIGHT * 3 / 4))
     text_hard = font.render("  hard  ", True, WHITE)
     text_hard_rect = text_hard.get_rect(center=(WIDTH * 3 / 4, HEIGHT * 3 / 4))
+
     pygame.display.update()
 
     waiting = True
     button_clicked = False
 
     # 自訂函式內的全域宣告
+    global alien_die
     global rock_quantity
     global speed_y_upper
     global speed_y_lower
@@ -183,6 +205,7 @@ def draw_init():
     global percentage
     global ammo_infinity
     global difficulty
+    alien_die = False
 
     # 待機畫面迴圈
     while waiting:
@@ -197,6 +220,7 @@ def draw_init():
 
             # 取得滑鼠點擊事件
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                # 簡單模式難度調整
                 if text_easy_rect.collidepoint(event.pos):
                     button_clicked = True
                     rock_quantity = 8
@@ -208,6 +232,7 @@ def draw_init():
                     ammo_infinity = True
                     difficulty = 1
 
+                # 普通模式難度調整
                 elif text_normal_rect.collidepoint(event.pos):
                     button_clicked = True
                     rock_quantity = 14
@@ -219,6 +244,7 @@ def draw_init():
                     ammo_infinity = False
                     difficulty = 2
 
+                # 困難模式難度調整
                 elif text_hard_rect.collidepoint(event.pos):
                     button_clicked = True
                     rock_quantity = 20
@@ -226,19 +252,144 @@ def draw_init():
                     speed_y_lower = 6
                     upgrading_time = 2500
                     shoot_interval = 1000
-                    percentage = 0.5
+                    percentage = 0.9
                     ammo_infinity = False
                     difficulty = 3
 
                 else:
                     button_clicked = False
 
+        # 按鈕繪製
         pygame.draw.rect(screen, (106, 90, 205), text_easy_rect, border_radius=15)
         screen.blit(text_easy, text_easy_rect)
         pygame.draw.rect(screen, (106, 90, 205), text_normal_rect, border_radius=15)
         screen.blit(text_normal, text_normal_rect)
         pygame.draw.rect(screen, (106, 90, 205), text_hard_rect, border_radius=15)
         screen.blit(text_hard, text_hard_rect)
+
+        if button_clicked:
+            waiting = False
+
+        pygame.display.update()
+
+
+# 勝利待機畫面
+def draw_victory_end(surf):
+    img = winner_img
+    img_rect = img.get_rect()
+    img_rect.centerx = WIDTH / 2
+    img_rect.centery = HEIGHT * 1 / 4
+    font = pygame.font.SysFont("Arial", 48)
+    screen.blit(background_img, (0, 0))
+
+    # 功能按鈕顯示
+    draw_text(screen, "VICTORY", 64, WIDTH / 2, HEIGHT / 2)
+    replay = font.render("  restart  ", True, WHITE)
+    replay_rect = replay.get_rect(center=(WIDTH / 4, HEIGHT * 3 / 4))
+    exit_game = font.render("  left game  ", True, WHITE)
+    exit_game_rect = exit_game.get_rect(center=(WIDTH * 3 / 4, HEIGHT * 3 / 4))
+
+    pygame.display.update()
+
+    waiting = True
+    button_clicked = False
+
+    # 自訂函式內的全域宣告
+    global is_replay
+    global show_init
+
+    while waiting:
+        clock.tick(FPS)
+
+        # 取得輸入
+        for event in pygame.event.get():
+
+            # 離開視窗
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return True
+
+            # 取得滑鼠點擊事件
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if replay_rect.collidepoint(event.pos):
+                    button_clicked = True
+                    is_replay = True
+                    show_init = True
+
+                elif exit_game_rect.collidepoint(event.pos):
+                    button_clicked = True
+                    pygame.quit()
+
+                else:
+                    button_clicked = False
+
+        # 按鈕繪製
+        pygame.draw.rect(screen, (106, 90, 205), replay_rect, border_radius=15)
+        screen.blit(replay, replay_rect)
+        pygame.draw.rect(screen, (106, 90, 205), exit_game_rect, border_radius=15)
+        screen.blit(exit_game, exit_game_rect)
+        surf.blit(img, img_rect)
+
+        if button_clicked:
+            waiting = False
+
+        pygame.display.update()
+
+
+# 失敗待機畫面
+def draw_lose_end(surf):
+    img = loser_img
+    img_rect = img.get_rect()
+    img_rect.centerx = WIDTH / 2
+    img_rect.centery = HEIGHT * 1 / 4
+    font = pygame.font.SysFont("Arial", 48)
+
+    # 功能按鈕顯示
+    draw_text(screen, "HAHA! LOSER~", 64, WIDTH / 2, HEIGHT / 2)
+    replay = font.render("  restart  ", True, WHITE)
+    replay_rect = replay.get_rect(center=(WIDTH / 4, HEIGHT * 3 / 4))
+    exit_game = font.render("  left game  ", True, WHITE)
+    exit_game_rect = exit_game.get_rect(center=(WIDTH * 3 / 4, HEIGHT * 3 / 4))
+    pygame.display.update()
+
+    waiting = True
+    button_clicked = False
+
+    # 自訂函式內的全域宣告
+    global is_replay
+    global show_init
+
+    while waiting:
+        clock.tick(FPS)
+
+        # 取得輸入
+        for event in pygame.event.get():
+
+            # 離開視窗
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return True
+
+            # 取得滑鼠點擊事件
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if replay_rect.collidepoint(event.pos):
+                    button_clicked = True
+                    is_replay = True
+                    show_init = True
+
+                elif exit_game_rect.collidepoint(event.pos):
+                    button_clicked = True
+                    pygame.quit()
+
+                else:
+                    button_clicked = False
+
+        # 按鈕繪製
+        pygame.draw.rect(screen, (106, 90, 205), replay_rect, border_radius=15)
+        screen.blit(replay, replay_rect)
+        pygame.draw.rect(screen, (106, 90, 205), exit_game_rect, border_radius=15)
+        screen.blit(exit_game, exit_game_rect)
+        surf.blit(img, img_rect)
 
         if button_clicked:
             waiting = False
@@ -254,7 +405,7 @@ class Player(pygame.sprite.Sprite):
         self.image = pygame.transform.scale(player_img, (100, 76))
         self.image.set_colorkey(BLACK)
         self.rect = self.image.get_rect()
-        self.radius = 35
+        self.radius = 32
         # pygame.draw.circle(self.image, RED, self.rect.center, self.radius)
         self.rect.x = 200
         self.rect.y = 200
@@ -285,7 +436,7 @@ class Player(pygame.sprite.Sprite):
         if self.hidden and now - self.hide_time > 1300:
             self.hidden = False
             self.rect.centerx = WIDTH / 2
-            self.rect.bottom = HEIGHT - 10
+            self.rect.bottom = HEIGHT - 100
 
         key_pressed = pygame.key.get_pressed()
 
@@ -339,7 +490,7 @@ class Player(pygame.sprite.Sprite):
                     self.ammo -= 1
                 if difficulty == 3:
                     self.ammo -= 1
-                shoot_sound.play()
+                # shoot_sound.play()
 
             elif self.gun == 2 and self.ammo >= 2:
                 bullet1 = Bullet(self.rect.left + 30, self.rect.centery - 30)
@@ -352,7 +503,7 @@ class Player(pygame.sprite.Sprite):
                     self.ammo -= 1
                 if difficulty == 3:
                     self.ammo -= 2
-                shoot_sound.play()
+                # shoot_sound.play()
 
             elif self.gun >= 3 and self.ammo >= 2:
                 bullet1 = Bullet(self.rect.left + 10, self.rect.centery)
@@ -369,7 +520,7 @@ class Player(pygame.sprite.Sprite):
                 if difficulty == 3:
                     self.ammo -= 3
 
-                shoot_sound.play()
+                # shoot_sound.play()
         self.shoot_time = pygame.time.get_ticks()
 
     # 損失一條命時會將戰艦暫時隱藏
@@ -378,10 +529,12 @@ class Player(pygame.sprite.Sprite):
         self.hide_time = pygame.time.get_ticks()
         self.rect.center = (WIDTH / 2, HEIGHT + 500)
 
+    # 增加射擊光束數量
     def gunup(self):
         self.gun += 1
         self.gun_time = pygame.time.get_ticks()
 
+    # 增加彈藥
     def reload(self):
         self.ammo += 40
 
@@ -391,7 +544,8 @@ class Rock(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.image_origin = random.choice(rock_imgs)
-        self.image_origin = pygame.transform.scale(self.image_origin, (random.randint(50, 200), random.randint(38, 152)))
+        self.image_origin = pygame.transform.scale(self.image_origin,
+                                                   (random.randint(50, 200), random.randint(38, 152)))
         self.image_origin.set_colorkey(BLACK)
         self.image = self.image_origin.copy()
         self.rect = self.image.get_rect()
@@ -425,10 +579,18 @@ class Rock(pygame.sprite.Sprite):
             self.speedy = random.randrange(2, 10)
 
 
+# 胖胖物件宣告
 class Fat_guy(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         global fat_guy_show
+
+        numbers = list(range(-15, 15))
+        numbers.remove(0)
+        num_list = list(map(int, numbers))
+        result_x = random.choice(num_list)
+        result_y = random.choice(num_list)
+
         self.image_origin = fat_guy_img
         self.image_origin = pygame.transform.scale(self.image_origin, (149, 172))
         self.image_origin.set_colorkey(BLACK)
@@ -438,7 +600,8 @@ class Fat_guy(pygame.sprite.Sprite):
         # pygame.draw.circle(self.image, RED, self.rect.center, self.radius)
         self.rect.x = WIDTH - 300
         self.rect.y = -400
-        self.speedx = 15
+        self.speedx = int(result_x)
+        self.speedy = int(result_y)
         self.total_degree = 0
         self.rotate_degree = 5
 
@@ -459,25 +622,33 @@ class Fat_guy(pygame.sprite.Sprite):
             self.rect.y = 100
             fat_guy_limit += 1
             fat_guy_temp += 1
+
         # 當胖胖和外星人碰撞後將不斷更新繼承外星人座標
         if F_A_collide:
             self.rect.x = Alien_x - 50
             self.rect.y = Alien_y - 150
+
+        # 邊緣碰撞轉向判斷
         if not F_A_collide:
             if self.rect.right > WIDTH + 200:
                 self.speedx = self.speedx * (-1)
             if self.rect.left < -200:
                 self.speedx = self.speedx * (-1)
             self.rect.x += self.speedx
+            if self.rect.top < -200:
+                self.speedy = self.speedy * (-1)
+            if self.rect.bottom > HEIGHT + 200:
+                self.speedy = self.speedy * (-1)
+            self.rect.y += self.speedy
 
-
+# 外星人物件宣告
 class Alien(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         global alien_show
         self.image = pygame.transform.scale(alien_img, (200, 200))
-        self.image.set_colorkey(BLACK)
         self.rect = self.image.get_rect()
+        self.image.set_colorkey(BLACK)
         self.radius = self.rect.width * 0.5
         # pygame.draw.circle(self.image, RED, self.rect.center, self.radius)
         self.rect.x = WIDTH / 2
@@ -492,6 +663,11 @@ class Alien(pygame.sprite.Sprite):
         alien_show = False
         alien_die = True
 
+    def attack(self):
+        laser = Laser(self.rect.centerx, self.rect.bottom)
+        all_sprites.add(laser)
+        lasers.add(laser)
+
     def update(self):
         global Alien_x
         global Alien_y
@@ -501,6 +677,9 @@ class Alien(pygame.sprite.Sprite):
             if alien_limit == 0:
                 self.rect.y = 75
                 alien_limit += 1
+            if times % 40 == 0:
+                for i in range(0, random.randint(1, 3)):
+                    self.attack()
             if times % 10 == 0:
                 self.speedx = random.randrange(-15, 15)
             if self.rect.right > WIDTH + 200:
@@ -510,6 +689,41 @@ class Alien(pygame.sprite.Sprite):
             self.rect.x += self.speedx
             Alien_x = self.rect.x
             Alien_y = self.rect.y
+
+
+# 外星人攻擊物件宣告
+class Laser(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        degree = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170]
+        # cos
+        move_x = [-0.9848, -0.9396, -0.8660, -0.7660, -0.6427, -0.5, -0.3420, -0.1736, 0, 0.1736, 0.3420, 0.5,
+                  0.6427, 0.7660, 0.8660, 0.9396, 0.9848]
+        # sin
+        move_y = [0.1736, 0.3420, 0.5, 0.6427, 0.7660, 0.8660, 0.9396, 0.9848, 1, 0.9848, 0.9396, 0.8660, 0.7660,
+                  0.6427, 0.5, 0.3420, 0.1736]
+        pygame.sprite.Sprite.__init__(self)
+        self.image_origin = pygame.transform.scale(alien_attack_img, (83, 50))
+        self.image_origin.set_colorkey(BLACK)
+        self.image = self.image_origin.copy()
+        self.rect = self.image.get_rect()
+        num = random.randint(0, 16)
+        self.rotate_degree = 60
+        self.image = pygame.transform.rotate(self.image_origin, degree[num])
+        center = self.rect.center
+        self.rect = self.image.get_rect()
+        self.rect.center = center
+        self.rect.centerx = x
+        self.rect.centery = y
+        self.speedx = move_x[num] * 10
+        self.speedy = move_y[num] * 10
+        self.damage = 50
+
+    def update(self):
+        self.rect.x += self.speedx
+        self.rect.y += self.speedy
+
+        if self.rect.bottom < 0 and self.rect.left > WIDTH + 50 and self.rect.right < -50:
+            self.kill()
 
 
 # 子彈物件宣告
@@ -581,6 +795,7 @@ def vector_2d_angle(v1, v2):
     v2_x = v2[0]
     v2_y = v2[1]
 
+    # noinspection PyBroadException
     # 向量內積求角度
     try:
         angle_ = math.degrees(math.acos(
@@ -695,16 +910,18 @@ lineType = cv2.LINE_AA  # 印出文字的邊框
 pTime = 0  # 開始時間初始化
 cTime = 0  # 目前時間初始化
 
+# 背景音樂循環播放
 pygame.mixer.music.play(-1)
 
 show_init = True
 running = True
 
+# mediapipe
 with mp_hands.Hands(
         max_num_hands=2,  # 偵測手掌數量
         model_complexity=1,  # 模型複雜度
-        min_detection_confidence=0.7,  # 最小偵測自信度
-        min_tracking_confidence=0.7) as hands:  # 最小追蹤自信度
+        min_detection_confidence=0.8,  # 最小偵測自信度
+        min_tracking_confidence=0.8) as hands:  # 最小追蹤自信度
 
     if not cap.isOpened():
         print("Cannot open camera")
@@ -717,6 +934,7 @@ with mp_hands.Hands(
         img = cv2.resize(img, (w, h))  # 縮小尺寸，加快處理效率
         times += 1
 
+        # 待機畫面
         if show_init:
             close = draw_init()
             score = 0
@@ -724,9 +942,11 @@ with mp_hands.Hands(
                 break
             show_init = False
 
+            # 角色與群組
             all_sprites = pygame.sprite.Group()
             rocks = pygame.sprite.Group()
             bullets = pygame.sprite.Group()
+            lasers = pygame.sprite.Group()
             powers = pygame.sprite.Group()
             player = Player()
             all_sprites.add(player)
@@ -738,11 +958,13 @@ with mp_hands.Hands(
             for i in range(rock_quantity):
                 new_rock()
 
+        # 2000分後肥肥出現
         if not fat_guy_show and score > 2000:
             all_sprites.add(fat_guy)
             fat_guy_show = True
             fat_guy_temp = 0
 
+        # 3000分後外星人出現
         if not alien_show and score > 3000 and not alien_die:
             all_sprites.add(alien)
             alien_show = True
@@ -765,15 +987,20 @@ with mp_hands.Hands(
                     y = i.y * h
                     x1 = hand_landmarks.landmark[4].x * w  # 取得大拇指末端 x 座標
                     y1 = hand_landmarks.landmark[4].y * h  # 取得大拇指末端 y 座標
+
                     x_wrist1 = hand_landmarks.landmark[0].x * w  # 取得手掌末端 x 座標
                     y_wrist1 = hand_landmarks.landmark[0].y * h  # 取得手掌末端 y 座標
                     z_wrist1 = hand_landmarks.landmark[0].z
+
                     finger_points.append((x, y))
 
                     y_shoot_upper = hand_landmarks.landmark[4].y * h
                     y_shoot_lower = hand_landmarks.landmark[6].y * h
 
-                    if y_shoot_lower - y_shoot_upper > 60:
+                    # if times % 2 == 0:
+                    #     y_move1 =
+
+                    if y_shoot_lower - y_shoot_upper > 40:
                         shoot = True
                         shoot_time = pygame.time.get_ticks()
                     else:
@@ -781,12 +1008,14 @@ with mp_hands.Hands(
                     now = pygame.time.get_ticks()
                     key_pressed = pygame.key.get_pressed()
 
+                    # 射擊間隔時間
                     if abs(now - shoot_time) > shoot_interval:
                         player.shoot()
                         shoot_time = now
                     # print(y_shoot_lower - y_shoot_upper)
                     # print(shoot_time - now)
 
+                # noinspection PyBroadException
                 # 計算斜率並輸出
                 try:
                     m = round(((y1 - y2) / (x1 - x2) * (-1)), 2)
@@ -812,6 +1041,7 @@ with mp_hands.Hands(
 
                 x2 = x1
                 y2 = y1
+                # y_move2 = y_move1
                 x_wrist2 = x_wrist1
                 y_wrist2 = y_wrist1
                 length2 = length1
@@ -859,7 +1089,7 @@ with mp_hands.Hands(
             #     if event.key == pygame.K_SPACE:
             #         player.shoot()
 
-        # 更新遊戲
+        # 更新所有角色
         all_sprites.update()
 
         # 判斷石頭和子彈相撞
@@ -871,6 +1101,7 @@ with mp_hands.Hands(
             explosion = Explosion(hit.rect.center, 'Large_Explosion')
             all_sprites.add(explosion)
 
+            # 掉寶機率
             if random.random() > percentage:
                 power = Power(hit.rect.center)
                 all_sprites.add(power)
@@ -886,6 +1117,7 @@ with mp_hands.Hands(
             all_sprites.add(explosion)
             player.health -= hit.radius
 
+            # 飛船爆炸動畫
             if player.health <= 0:
                 death_expl = Explosion(player.rect.center, 'Player')
                 all_sprites.add(death_expl)
@@ -921,9 +1153,41 @@ with mp_hands.Hands(
             F_A_collide = True
 
         # 判斷博偉和子彈相撞
-        hits = pygame.sprite.spritecollide(fat_guy, bullets, True, pygame.sprite.collide_circle)
+        if difficulty != 1:
+            hits = pygame.sprite.spritecollide(fat_guy, bullets, True, pygame.sprite.collide_circle)
+            for hit in hits:
+                player.health -= 20
+
+                if player.health <= 0:
+                    death_expl = Explosion(player.rect.center, 'Player')
+                    all_sprites.add(death_expl)
+                    die_sound.play()
+                    player.lives -= 1
+
+                    if player.lives > 0:
+                        player.health = 100
+                    player.hide()
+
+        # 判斷外星人和子彈相撞
+        if alien_show:
+            hits = pygame.sprite.spritecollide(alien, bullets, True, pygame.sprite.collide_circle)
+            for hit in hits:
+                alien.health -= 20
+                # print("外星人生命值:", alien.health)
+                if alien.health <= 0 and alien_show:
+                    explosion = Explosion(hit.rect.center, 'Alien')
+                    all_sprites.add(explosion)
+                    alien.hide()
+                    F_A_collide = False
+
+        # 判斷子彈和雷射光束相撞
+        if alien_show:
+            hits = pygame.sprite.groupcollide(lasers, bullets, False, True)
+
+        # 判斷飛船和雷射光束相撞
+        hits = pygame.sprite.spritecollide(player, lasers, True)
         for hit in hits:
-            player.health -= 20
+            player.health -= 50
 
             if player.health <= 0:
                 death_expl = Explosion(player.rect.center, 'Player')
@@ -935,30 +1199,24 @@ with mp_hands.Hands(
                     player.health = 100
                 player.hide()
 
-        # 判斷外星人和子彈相撞
-        if alien_show:
-            hits = pygame.sprite.spritecollide(alien, bullets, True, pygame.sprite.collide_circle)
-            for hit in hits:
-                alien.health -= 20
-                print("外星人生命值:", alien.health)
-                if alien.health <= 0 and alien_show:
-                    explosion = Explosion(hit.rect.center, 'Alien')
-                    all_sprites.add(explosion)
-                    alien.hide()
-                    alien.kill()
-                    all_sprites.remove(alien)
-                    F_A_collide = False
-
         slope = 0
 
         if player.lives <= 0 and not (death_expl.alive()):
-            show_init = True
+            draw_lose_end(screen)
+
+        # if is_replay == True:
+        #     show_init = True
+
+        if not show_init:
+            if alien_die:
+                draw_victory_end(screen)
 
         # 畫面顯示
         screen.blit(background_img, (0, 0))
         all_sprites.draw(screen)
         draw_text(screen, str(score), 18, WIDTH / 2, 10)
         draw_health(screen, player.health, 25, 17)
+        draw_alien_health(screen, alien.health, alien.rect.centerx - 50, alien.rect.top - 15)
         draw_text(screen, "HP", 14, 12, 11)
         draw_lives(screen, player.lives, player_mini_img, WIDTH - 110, 15)
 
