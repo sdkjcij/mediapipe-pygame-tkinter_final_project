@@ -41,6 +41,8 @@ player_img = pygame.image.load(os.path.join("img", "universeship.png")).convert(
 player_mini_img = pygame.transform.scale(player_img, (25, 19))
 player_mini_img.set_colorkey(BLACK)
 pygame.display.set_icon(player_mini_img)
+protection_img = pygame.image.load(os.path.join("img", "protection.png"))
+protection_img = pygame.transform.scale(protection_img, (150, 100))
 bullet_img = pygame.image.load(os.path.join("img", "bullet.png")).convert()
 rock_imgs = []
 for i in range(10):
@@ -70,7 +72,9 @@ for i in range(10):
 
 ammo_image = pygame.image.load(os.path.join("img", "ammo.png")).convert()
 ammo_image = pygame.transform.scale(ammo_image, (60, 60))
-power_imgs = {'shield': pygame.image.load(os.path.join("img", "shield.png")).convert(),
+blood_bottle_img = pygame.image.load(os.path.join("img", "blood_bottle.png"))
+blood_bottle_img = pygame.transform.scale(blood_bottle_img, (60, 60))
+power_imgs = {'blood_bottle': blood_bottle_img,
               'gun': pygame.image.load(os.path.join("img", "gun.png")).convert(),
               'ammo': ammo_image}
 alien_attack_img = pygame.image.load(os.path.join("img", "alien_attack.png")).convert()
@@ -78,7 +82,7 @@ alien_attack_img = pygame.image.load(os.path.join("img", "alien_attack.png")).co
 # 載入音樂、音效
 shoot_sound = pygame.mixer.Sound(os.path.join("sound", "shoot.wav"))
 gun_sound = pygame.mixer.Sound(os.path.join("sound", "pow1.wav"))
-shield_sound = pygame.mixer.Sound(os.path.join("sound", "pow0.wav"))
+blood_bottle_sound = pygame.mixer.Sound(os.path.join("sound", "pow0.wav"))
 reload_sound = pygame.mixer.Sound(os.path.join("sound", "reload.wav"))
 die_sound = pygame.mixer.Sound(os.path.join("sound", "rumble.ogg"))
 explosion_sounds = [
@@ -115,6 +119,13 @@ Alien_y = 0
 times = 0
 alien_die = False
 is_replay = False
+is_player_hide = False
+Player_x = 0
+Player_y = 0
+shield_time = 0
+shield_now = 0
+move_x = 0
+move_y = 0
 
 
 # 中文&英文文字顯示
@@ -429,12 +440,18 @@ class Player(pygame.sprite.Sprite):
 
     def update(self):
         now = pygame.time.get_ticks()
+        global move_x
+        global move_y
+        global shield_time
+        global is_player_hide
         if self.gun > 1 and now - self.gun_time > upgrading_time:
             self.gun -= 1
             self.gun_time = now
 
-        if self.hidden and now - self.hide_time > 1300:
+        if self.hidden and now - self.hide_time > 1000:
+            shield_time = pygame.time.get_ticks()
             self.hidden = False
+            is_player_hide = False
             self.rect.centerx = WIDTH / 2
             self.rect.bottom = HEIGHT - 100
 
@@ -478,6 +495,10 @@ class Player(pygame.sprite.Sprite):
 
         global ammo
         ammo = self.ammo
+        global Player_x
+        global Player_y
+        Player_x = self.rect.x
+        Player_y = self.rect.y
 
     # 射擊函式
     def shoot(self):
@@ -525,7 +546,9 @@ class Player(pygame.sprite.Sprite):
 
     # 損失一條命時會將戰艦暫時隱藏
     def hide(self):
+        global shield_now
         self.hidden = True
+        shield_now = pygame.time.get_ticks()
         self.hide_time = pygame.time.get_ticks()
         self.rect.center = (WIDTH / 2, HEIGHT + 500)
 
@@ -537,6 +560,47 @@ class Player(pygame.sprite.Sprite):
     # 增加彈藥
     def reload(self):
         self.ammo += 40
+
+
+class Shield(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image_origin = pygame.image.load(os.path.join("img", "protection.png")).convert()
+        self.image_origin.set_colorkey(BLACK)
+        self.image = self.image_origin.copy()
+        self.rect = self.image.get_rect()
+        self.radius = self.rect.width * 3 / 2
+        self.rect.x = WIDTH / 2
+        self.rect.y = HEIGHT / 2
+        self.total_degree = 0
+        self.rotate_degree = 3
+        # self.speedy = 2
+
+    def rotate(self):
+        self.total_degree += self.rotate_degree
+        self.total_degree = self.total_degree % 360
+        self.image = pygame.transform.rotate(self.image_origin, self.total_degree)
+        center = self.rect.center
+        self.rect = self.image.get_rect()
+        self.rect.center = center
+
+    def update(self):
+        global shield_time
+        global shield_now
+        global Player_x
+        global Player_y
+        self.rotate()
+        # self.rect.x = Player_x - 200
+        # self.rect.y = Player_y - 100
+        print(shield_time, shield_now)
+        shield_time = pygame.time.get_ticks()
+        if not player.hidden and abs(shield_time - shield_now) < 6000:
+            # shield_time = pygame.time.get_ticks()
+            self.rect.x = Player_x - 75
+            self.rect.y = Player_y - 100
+        elif abs(shield_time - shield_now) > 6000:
+            self.rect.x = WIDTH
+            self.rect.y = -400
 
 
 # 石頭物件宣告
@@ -640,6 +704,7 @@ class Fat_guy(pygame.sprite.Sprite):
             if self.rect.bottom > HEIGHT + 200:
                 self.speedy = self.speedy * (-1)
             self.rect.y += self.speedy
+
 
 # 外星人物件宣告
 class Alien(pygame.sprite.Sprite):
@@ -774,7 +839,7 @@ class Explosion(pygame.sprite.Sprite):
 class Power(pygame.sprite.Sprite):
     def __init__(self, center):
         pygame.sprite.Sprite.__init__(self)
-        self.type = random.choice(['shield', 'gun', 'ammo'])
+        self.type = random.choice(['blood_bottle', 'gun', 'ammo'])
         self.image = power_imgs[self.type]
         self.image.set_colorkey(BLACK)
         self.rect = self.image.get_rect()
@@ -920,8 +985,8 @@ running = True
 with mp_hands.Hands(
         max_num_hands=2,  # 偵測手掌數量
         model_complexity=1,  # 模型複雜度
-        min_detection_confidence=0.8,  # 最小偵測自信度
-        min_tracking_confidence=0.8) as hands:  # 最小追蹤自信度
+        min_detection_confidence=0.6,  # 最小偵測自信度
+        min_tracking_confidence=0.6) as hands:  # 最小追蹤自信度
 
     if not cap.isOpened():
         print("Cannot open camera")
@@ -949,7 +1014,9 @@ with mp_hands.Hands(
             lasers = pygame.sprite.Group()
             powers = pygame.sprite.Group()
             player = Player()
+            shield = Shield()
             all_sprites.add(player)
+            all_sprites.add(shield)
             fat_guy = Fat_guy()
             alien = Alien()
             fat_guy_show = False
@@ -1073,6 +1140,7 @@ with mp_hands.Hands(
         fps = 1 / (cTime - pTime)
         pTime = cTime
         cv2.putText(img, str(int(fps)), (600, 30), fontFace, 1, (0, 255, 0), 2, lineType)
+        # cv2.circle(img, (320, 240), 150, BLACK, 2)
 
         cv2.imshow('finger_recognition', img)
 
@@ -1131,12 +1199,12 @@ with mp_hands.Hands(
         # 判斷掉落的寶物和飛船相撞
         hits = pygame.sprite.spritecollide(player, powers, True)
         for hit in hits:
-            if hit.type == 'shield':
+            if hit.type == 'blood_bottle':
                 player.health += 20
 
                 if player.health > 100:
                     player.health = 100
-                shield_sound.play()
+                blood_bottle_sound.play()
 
             elif hit.type == 'gun':
                 player.gunup()
@@ -1146,13 +1214,13 @@ with mp_hands.Hands(
                 player.reload()
                 reload_sound.play()
 
-        # 判斷博偉和外星人相撞
+        # 判斷胖胖和外星人相撞
         hits = pygame.sprite.collide_circle(fat_guy, alien)
         if hits:
             # Fat and Alien collation
             F_A_collide = True
 
-        # 判斷博偉和子彈相撞
+        # 判斷胖胖和子彈相撞
         if difficulty != 1:
             hits = pygame.sprite.spritecollide(fat_guy, bullets, True, pygame.sprite.collide_circle)
             for hit in hits:
@@ -1198,6 +1266,20 @@ with mp_hands.Hands(
                 if player.lives > 0:
                     player.health = 100
                 player.hide()
+
+        # 判斷防護罩和石頭相撞
+        hits = pygame.sprite.spritecollide(shield, rocks, True)
+        for hit in hits:
+            new_rock()
+            explosion = Explosion(hit.rect.center, 'Small_Explosion')
+            all_sprites.add(explosion)
+
+        # 判斷防護罩和雷射光束相撞
+        hits = pygame.sprite.spritecollide(shield, lasers, True)
+        for hit in hits:
+            new_rock()
+            explosion = Explosion(hit.rect.center, 'Small_Explosion')
+            all_sprites.add(explosion)
 
         slope = 0
 
