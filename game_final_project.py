@@ -6,7 +6,7 @@ import time
 import pygame
 import random
 import os
-
+import subprocess
 FPS = 120
 WIDTH = 1000
 HEIGHT = 700
@@ -35,8 +35,17 @@ pygame.display.set_caption("星際戰艦生存戰")
 clock = pygame.time.Clock()
 
 # 載入圖片
+with open('test_a.txt', 'r') as f:
+    a = int(f.read())    
 background_img = pygame.image.load(os.path.join("img", "background.jpg")).convert()
-player_img = pygame.image.load(os.path.join("img", "universeship.png")).convert()
+if a == 1:
+    player_img = pygame.image.load(os.path.join("2img2", "universeship.png")).convert()
+elif a == 2:
+    player_img = pygame.image.load(os.path.join("2img2", "UFO.png")).convert()
+elif a == 3:
+    player_img = pygame.image.load(os.path.join("2img2", "universeship1.png")).convert()
+elif a == 4:
+    player_img = pygame.image.load(os.path.join("2img2", "universeship2.png")).convert()
 # player_img = pygame.image.load(os.path.join("img", "player.png")).convert()
 player_mini_img = pygame.transform.scale(player_img, (25, 19))
 player_mini_img.set_colorkey(BLACK)
@@ -126,7 +135,6 @@ shield_time = 0
 shield_now = 0
 move_x = 0
 move_y = 0
-
 
 # 中文&英文文字顯示
 def draw_text(surf, text, size, x, y):
@@ -329,6 +337,7 @@ def draw_victory_end(surf):
 
                 elif exit_game_rect.collidepoint(event.pos):
                     button_clicked = True
+                    subprocess.Popen(["python", "testtest.py"])
                     pygame.quit()
 
                 else:
@@ -390,8 +399,9 @@ def draw_lose_end(surf):
 
                 elif exit_game_rect.collidepoint(event.pos):
                     button_clicked = True
+                    subprocess.Popen(["python", "testtest.py"])
                     pygame.quit()
-
+                    
                 else:
                     button_clicked = False
 
@@ -413,7 +423,10 @@ class Player(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         # self.image = pygame.transform.scale(player_img, (50, 38))
-        self.image = pygame.transform.scale(player_img, (100, 76))
+        global a
+        self.image = pygame.transform.scale(player_img, (150, 105))
+        if a == 4:
+            self.image = pygame.transform.rotate(self.image, 270)
         self.image.set_colorkey(BLACK)
         self.rect = self.image.get_rect()
         self.radius = 32
@@ -570,10 +583,10 @@ class Shield(pygame.sprite.Sprite):
         self.image = self.image_origin.copy()
         self.rect = self.image.get_rect()
         self.radius = self.rect.width * 3 / 2
-        self.rect.x = WIDTH / 2
-        self.rect.y = HEIGHT / 2
+        self.rect.x = WIDTH/2
+        self.rect.y = HEIGHT/2
         self.total_degree = 0
-        self.rotate_degree = 3
+        self.rotate_degree = 5
         # self.speedy = 2
 
     def rotate(self):
@@ -589,7 +602,7 @@ class Shield(pygame.sprite.Sprite):
         global shield_now
         global Player_x
         global Player_y
-        self.rotate()
+        # self.rotate()
         # self.rect.x = Player_x - 200
         # self.rect.y = Player_y - 100
         print(shield_time, shield_now)
@@ -1214,13 +1227,13 @@ with mp_hands.Hands(
                 player.reload()
                 reload_sound.play()
 
-        # 判斷胖胖和外星人相撞
+        # 判斷博偉和外星人相撞
         hits = pygame.sprite.collide_circle(fat_guy, alien)
         if hits:
             # Fat and Alien collation
             F_A_collide = True
 
-        # 判斷胖胖和子彈相撞
+        # 判斷博偉和子彈相撞
         if difficulty != 1:
             hits = pygame.sprite.spritecollide(fat_guy, bullets, True, pygame.sprite.collide_circle)
             for hit in hits:
